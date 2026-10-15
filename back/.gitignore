@@ -1,0 +1,19 @@
+# Dependências
+/node_modules
+
+# Build
+/dist
+
+# Variáveis de ambiente
+.env
+.env.local
+
+# Prisma
+/prisma/migrations/dev.db*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema
+.DS_Store

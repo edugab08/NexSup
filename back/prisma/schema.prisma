@@ -1,0 +1,351 @@
+// ─── NexSupport · Prisma Schema (completo) ───────────────────────────────────
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  ENUMS
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum Role {
+  USER   // Solicitante: abre e acompanha os próprios chamados
+  AGENT  // Atendente: resolve chamados do(s) seu(s) setor(es)
+  ADMIN  // Administrador: acesso total ao sistema
+}
+
+enum TicketStatus {
+  ABERTO         // Recém-criado, aguardando triagem
+  EM_ANDAMENTO   // Um agente assumiu e está trabalhando
+  AGUARDANDO     // Esperando resposta do solicitante
+  RESOLVIDO      // Solução aplicada, aguardando confirmação
+  FECHADO        // Encerrado definitivamente
+  REABERTO       // Reaberto após estar resolvido/fechado
+}
+
+enum TicketPriority {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum NotificationType {
+  CHAMADO_CRIADO
+  CHAMADO_ATRIBUIDO
+  NOVO_COMENTARIO
+  STATUS_ALTERADO
+  CHAMADO_RESOLVIDO
+  CHAMADO_REABERTO
+  SLA_VIOLADO
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  USUÁRIOS E SETORES
+// ═══════════════════════════════════════════════════════════════════════════
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  phone        String?
+  avatarUrl    String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relações de chamados
+  tickets         Ticket[]        @relation("TicketOwner")
+  assignedTickets Ticket[]        @relation("TicketAssignee")
+
+  // Interações
+  comments        Comment[]
+  attachments     Attachment[]
+  historyChanges  TicketHistory[] @relation("HistoryChanger")
+  notifications   Notification[]
+  ratingsGiven    Rating[]        @relation("RatingAuthor")
+  articlesWritten KbArticle[]     @relation("ArticleAuthor")
+  auditLogs       AuditLog[]
+
+  // Setores em que atua (agentes/admins)
+  departments DepartmentMember[]
+
+  @@index([role])
+  @@index([email])
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tickets    Ticket[]
+  members    DepartmentMember[]
+  categories Category[]
+
+  @@index([active])
+}
+
+// Tabela de junção: quais usuários atendem quais setores
+model DepartmentMember {
+  id           String   @id @default(uuid())
+  userId       String
+  departmentId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, departmentId])
+  @@index([departmentId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CATEGORIAS, SLA E TAGS
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Category {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  // Categoria pode pertencer a um setor
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  tickets Ticket[]
+
+  @@unique([name, departmentId])
+  @@index([departmentId])
+}
+
+// Política de SLA por prioridade: prazos de resposta e resolução (em minutos)
+model SlaPolicy {
+  id                String         @id @default(uuid())
+  priority          TicketPriority @unique
+  responseTimeMins  Int            // tempo máximo até a 1ª resposta
+  resolutionTimeMins Int           // tempo máximo até a resolução
+  active            Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("#64748b")
+  createdAt DateTime @default(now())
+
+  tickets TicketTag[]
+}
+
+model TicketTag {
+  ticketId String
+  tagId    String
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([ticketId, tagId])
+  @@index([tagId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CHAMADOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Ticket {
+  id          String         @id @default(uuid())
+  number      Int            @unique @default(autoincrement()) // nº legível (#1, #2...)
+  title       String
+  description String
+  status      TicketStatus   @default(ABERTO)
+  priority    TicketPriority @default(MEDIA)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  firstReplyAt DateTime? // quando o 1º agente respondeu (para SLA de resposta)
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+  reopenedAt   DateTime?
+
+  // Prazos de SLA calculados na criação
+  slaResponseDue   DateTime?
+  slaResolutionDue DateTime?
+  slaResponseBreached   Boolean @default(false)
+  slaResolutionBreached Boolean @default(false)
+
+  // Dono (quem abriu)
+  userId String
+  user   User   @relation("TicketOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Agente responsável
+  assignedTo String?
+  assigned   User?   @relation("TicketAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  // Setor e categoria
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  categoryId   String?
+  category     Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  comments      Comment[]
+  attachments   Attachment[]
+  ticketHistory TicketHistory[]
+  tags          TicketTag[]
+  rating        Rating?
+
+  @@index([userId])
+  @@index([assignedTo])
+  @@index([departmentId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  COMENTÁRIOS, ANEXOS, HISTÓRICO
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String
+  internal  Boolean  @default(false) // nota interna (só agentes/admins veem)
+  createdAt DateTime @default(now())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  attachments Attachment[]
+
+  @@index([ticketId])
+  @@index([authorId])
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  filename  String   // nome original do arquivo
+  storedName String  // nome no storage (uuid)
+  mimeType  String
+  sizeBytes Int
+  url       String
+  createdAt DateTime @default(now())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  // Anexo pode estar ligado a um comentário específico
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  uploadedBy String
+  uploader   User   @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model TicketHistory {
+  id           String   @id @default(uuid())
+  fieldChanged String
+  oldValue     String?
+  newValue     String?
+  changedAt    DateTime @default(now())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  changedBy String
+  changer   User   @relation("HistoryChanger", fields: [changedBy], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  AVALIAÇÃO DE ATENDIMENTO
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Rating {
+  id        String   @id @default(uuid())
+  score     Int      // 1 a 5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  ticketId String @unique
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("RatingAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([score])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NOTIFICAÇÕES
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  link      String?          // ex: /chamado/:id
+  createdAt DateTime         @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  BASE DE CONHECIMENTO
+// ═══════════════════════════════════════════════════════════════════════════
+
+model KbArticle {
+  id        String   @id @default(uuid())
+  title     String
+  content   String   // markdown
+  published Boolean  @default(false)
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authorId String
+  author   User   @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([published])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  AUDITORIA (trilha de ações sensíveis)
+// ═══════════════════════════════════════════════════════════════════════════
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String   // ex: "USER_PROMOTED", "TICKET_DELETED"
+  entity    String   // ex: "User", "Ticket"
+  entityId  String?
+  details   String?  // JSON serializado com contexto
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  userId String?
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}

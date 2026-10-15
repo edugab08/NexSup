@@ -1,0 +1,8 @@
+NexSupport é um sistema de Help Desk desenvolvido com o objetivo de organizar e gerenciar chamados de suporte técnico de forma prática e eficiente. O projeto simula um ambiente real de atendimento, permitindo o cadastro de usuários, abertura de chamados, acompanhamento de status e administração completa das solicitações. O principal objetivo do sistema é facilitar a organização dos atendimentos, controlar o andamento dos chamados, priorizar demandas e manter um histórico detalhado das solicitações realizadas.
+
+O sistema possui funcionalidades tanto para usuários quanto para administradores. O usuário pode criar conta, realizar login, abrir chamados descrevendo o problema, acompanhar o status da solicitação e visualizar seu histórico de atendimentos. Já o administrador tem acesso a um painel completo onde pode visualizar todos os chamados, alterar o status entre “Aberto”, “Em andamento” e “Resolvido”, definir prioridades, aplicar filtros por status e gerenciar usuários cadastrados.
+
+A estrutura do sistema inclui tela de login, dashboard principal com visão geral dos chamados, área de abertura de chamado, listagem com filtros por status e painel administrativo. A interface foi projetada com foco em organização, clareza visual e experiência do usuário, contando com menu lateral, indicadores visuais e sistema de filtros para facilitar a navegação.
+
+Projeto desenvolvido por Eduardo Gabriel, Thomas Andriel e Pedro Henrique Bernaski
+ 
