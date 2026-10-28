@@ -1,0 +1,11 @@
+{
+  "valido": {
+    "email": "usuario@nexsupport.com",
+    "senha": "user1234",
+    "nome": "João Silva"
+  },
+  "senhaIncorreta": {
+    "email": "usuario@nexsupport.com",
+    "senha": "senhaerrada123"
+  }
+}

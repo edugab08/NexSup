@@ -2,17 +2,15 @@
 
 /**
  * Suíte E2E — NexSupport
- * Todos os elementos são localizados exclusivamente por [data-cy].
+ * Seletores ficam nos Page Objects (support/pages); dados ficam em fixtures/.
  * Pré-requisito: API no ar e banco populado (npm run prisma:seed).
  */
 
 import { loginPage, dashboardPage, novoChamadoPage, toast } from '../support/pages';
+import usuarios from '../fixtures/usuarios.json';
+import chamados from '../fixtures/chamados.json';
 
-const USUARIO = {
-  email: 'usuario@nexsupport.com',
-  senha: 'user1234',
-  nome: 'João Silva',
-};
+const USUARIO = usuarios.valido;
 
 describe('Casos de Teste - NexSupport', () => {
   it('CT01 - Deve realizar login com sucesso como Usuário', () => {
@@ -30,12 +28,12 @@ describe('Casos de Teste - NexSupport', () => {
   });
 
   it('CT02 - Deve exibir alerta de erro ao tentar login com senha incorreta', () => {
-    loginPage.visitar().autenticar(USUARIO.email, 'senhaerrada123');
+    const { email, senha } = usuarios.senhaIncorreta;
+
+    loginPage.visitar().autenticar(email, senha);
 
     // 1) O alerta de erro aparece com a mensagem retornada pela API
-    toast.erro()
-      .should('be.visible')
-      .and('contain', 'Credenciais inválidas');
+    toast.erro().should('be.visible').and('contain', 'Credenciais inválidas');
     // 2) Continua na tela de login
     cy.deveEstarEm('/login');
     // 3) Nenhuma sessão foi criada
@@ -57,18 +55,17 @@ describe('Casos de Teste - NexSupport', () => {
   });
 
   it('CT04 - Deve criar um novo chamado com sucesso', () => {
-    // Título único: evita falso positivo com chamados criados em execuções anteriores
-    const titulo = `Impressora do RH sem tinta ${Date.now()}`;
+    const { titulo, descricao, mensagemSucesso } = chamados.novo;
 
     cy.loginComo(USUARIO);
 
     dashboardPage.abrirNovoChamado();
     cy.deveEstarEm('/novo-chamado');
 
-    novoChamadoPage.criar(titulo, 'A impressora principal não está imprimindo preto.');
+    novoChamadoPage.criar(titulo, descricao);
 
     // 1) Confirmação de sucesso específica do chamado (não a do login)
-    toast.sucesso().should('contain', 'Chamado aberto com sucesso');
+    toast.sucesso().should('contain', mensagemSucesso);
     // 2) Voltou para a home
     cy.deveEstarEm('/');
     // 3) O chamado recém-criado aparece na lista
