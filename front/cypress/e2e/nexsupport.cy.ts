@@ -7,8 +7,10 @@
  */
 
 import { loginPage, dashboardPage, novoChamadoPage, toast } from '../support/pages';
+import { stubLoginInvalido, stubApiChamados } from '../support/stubs';
 import usuarios from '../fixtures/usuarios.json';
 import chamados from '../fixtures/chamados.json';
+import respostaErro from '../fixtures/respostas/login-credenciais-invalidas.json';
 
 const USUARIO = usuarios.valido;
 
@@ -29,11 +31,13 @@ describe('Casos de Teste - NexSupport', () => {
 
   it('CT02 - Deve exibir alerta de erro ao tentar login com senha incorreta', () => {
     const { email, senha } = usuarios.senhaIncorreta;
+    stubLoginInvalido(); // cenário de FALHA: API responde 401
 
     loginPage.visitar().autenticar(email, senha);
+    cy.wait('@loginInvalido');
 
     // 1) O alerta de erro aparece com a mensagem retornada pela API
-    toast.erro().should('be.visible').and('contain', 'Credenciais inválidas');
+    toast.erro().should('be.visible').and('contain', respostaErro.message);
     // 2) Continua na tela de login
     cy.deveEstarEm('/login');
     // 3) Nenhuma sessão foi criada
@@ -57,12 +61,19 @@ describe('Casos de Teste - NexSupport', () => {
   it('CT04 - Deve criar um novo chamado com sucesso', () => {
     const { titulo, descricao, mensagemSucesso } = chamados.novo;
 
+    stubApiChamados(); // cenário de SUCESSO: API de chamados em memória
+
     cy.loginComo(USUARIO);
 
     dashboardPage.abrirNovoChamado();
     cy.deveEstarEm('/novo-chamado');
 
     novoChamadoPage.criar(titulo, descricao);
+
+    // A UI enviou à API exatamente o que foi digitado
+    cy.wait('@criarChamado')
+      .its('request.body')
+      .should('include', { title: titulo, description: descricao });
 
     // 1) Confirmação de sucesso específica do chamado (não a do login)
     toast.sucesso().should('contain', mensagemSucesso);

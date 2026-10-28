@@ -20,7 +20,7 @@ declare global {
 
 Cypress.Commands.add('loginComo', ({ email, senha }) => {
   // Observa a chamada real de login para sincronizar sem esperas fixas.
-  cy.intercept('POST', API.login).as('login');
+  cy.intercept({ method: 'POST', pathname: API.login }).as('login');
   loginPage.visitar().autenticar(email, senha);
   cy.wait('@login').its('response.statusCode').should('eq', 200);
   cy.deveEstarEm('/');
