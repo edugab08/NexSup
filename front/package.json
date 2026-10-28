@@ -10,7 +10,9 @@
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
     "e2e": "start-server-and-test start http://localhost:3000/login cypress:run",
-    "e2e:dev": "start-server-and-test dev http://localhost:3000/login cypress:run"
+    "e2e:dev": "start-server-and-test dev http://localhost:3000/login cypress:run",
+    "check:esperas": "node scripts/check-esperas.mjs",
+    "e2e:3x": "npm run check:esperas && npm run e2e && npm run e2e && npm run e2e"
   },
   "dependencies": {
     "lucide-react": "^0.577.0",
