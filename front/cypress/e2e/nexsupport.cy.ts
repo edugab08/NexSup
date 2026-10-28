@@ -6,6 +6,8 @@
  * Pré-requisito: API no ar e banco populado (npm run prisma:seed).
  */
 
+import { loginPage, dashboardPage, novoChamadoPage, toast } from '../support/pages';
+
 const USUARIO = {
   email: 'usuario@nexsupport.com',
   senha: 'user1234',
@@ -16,10 +18,7 @@ const COOKIE_TOKEN = 'nexsupport_token';
 
 // Preenche e envia o formulário de login pela interface.
 function preencherLogin(email: string, senha: string) {
-  cy.visit('/login');
-  cy.get('[data-cy="input-email"]').type(email);
-  cy.get('[data-cy="input-senha"]').type(senha);
-  cy.get('[data-cy="btn-login"]').click();
+  loginPage.visitar().autenticar(email, senha);
 }
 
 describe('Casos de Teste - NexSupport', () => {
@@ -31,17 +30,17 @@ describe('Casos de Teste - NexSupport', () => {
     // 2) A sessão foi criada (cookie lido pelo middleware)
     cy.getCookie(COOKIE_TOKEN).should('exist');
     // 3) O usuário exibido na tela é o que fez login
-    cy.get('[data-cy="nome-usuario"]').should('contain', USUARIO.nome);
+    dashboardPage.nomeUsuario().should('contain', USUARIO.nome);
     // 4) O painel e a lista de chamados foram renderizados
-    cy.get('[data-cy="dashboard-container"]').should('be.visible');
-    cy.get('[data-cy="lista-chamados"]').should('exist');
+    dashboardPage.container().should('be.visible');
+    dashboardPage.listaChamados().should('exist');
   });
 
   it('CT02 - Deve exibir alerta de erro ao tentar login com senha incorreta', () => {
     preencherLogin(USUARIO.email, 'senhaerrada123');
 
     // 1) O alerta de erro aparece com a mensagem retornada pela API
-    cy.get('[data-cy="toast-error"]')
+    toast.erro()
       .should('be.visible')
       .and('contain', 'Credenciais inválidas');
     // 2) Continua na tela de login
@@ -64,7 +63,7 @@ describe('Casos de Teste - NexSupport', () => {
     cy.location('search').should('include', 'novo-chamado');
     // 3) Não existe sessão e o formulário de login está disponível
     cy.getCookie(COOKIE_TOKEN).should('not.exist');
-    cy.get('[data-cy="btn-login"]').should('be.visible');
+    loginPage.botaoEntrar().should('be.visible');
   });
 
   it('CT04 - Deve criar um novo chamado com sucesso', () => {
@@ -74,21 +73,17 @@ describe('Casos de Teste - NexSupport', () => {
     preencherLogin(USUARIO.email, USUARIO.senha);
     cy.location('pathname').should('eq', '/');
 
-    cy.get('[data-cy="btn-novo-chamado"]').click();
+    dashboardPage.abrirNovoChamado();
     cy.location('pathname').should('eq', '/novo-chamado');
 
-    cy.get('[data-cy="input-titulo-chamado"]').type(titulo);
-    cy.get('[data-cy="textarea-desc-chamado"]').type(
-      'A impressora principal não está imprimindo preto.',
-    );
-    cy.get('[data-cy="btn-salvar-chamado"]').click();
+    novoChamadoPage.criar(titulo, 'A impressora principal não está imprimindo preto.');
 
     // 1) Confirmação de sucesso específica do chamado (não a do login)
-    cy.get('[data-cy="toast-success"]').should('contain', 'Chamado aberto com sucesso');
+    toast.sucesso().should('contain', 'Chamado aberto com sucesso');
     // 2) Voltou para a home
     cy.location('pathname').should('eq', '/');
     // 3) O chamado recém-criado aparece na lista
-    cy.get('[data-cy="lista-chamados"]').should('contain', titulo);
+    dashboardPage.listaChamados().should('contain', titulo);
   });
 
   it('CT05 - Deve realizar logout com sucesso', () => {
@@ -96,11 +91,11 @@ describe('Casos de Teste - NexSupport', () => {
     cy.location('pathname').should('eq', '/');
     cy.getCookie(COOKIE_TOKEN).should('exist');
 
-    cy.get('[data-cy="btn-logout"]').click();
+    dashboardPage.sair();
 
     // 1) Voltou para o login com os campos vazios
     cy.location('pathname').should('eq', '/login');
-    cy.get('[data-cy="input-email"]').should('be.visible').and('have.value', '');
+    loginPage.campoEmail().should('be.visible').and('have.value', '');
     // 2) A sessão foi encerrada
     cy.getCookie(COOKIE_TOKEN).should('not.exist');
     // 3) A home deixou de ser acessível sem novo login
