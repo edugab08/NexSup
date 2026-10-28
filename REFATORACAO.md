@@ -6,8 +6,8 @@ Suíte: `front/cypress/e2e/nexsupport.cy.ts` (CT01–CT05, mesma cobertura da A1
 
 | # | Smell | Onde | Por que é problema |
 |---|-------|------|--------------------|
-| 1 | Seletores `[data-cy=...]` espalhados | 32 ocorrências em CT01–CT05 | Se um `data-cy` mudar, é preciso caçar o texto em todos os testes |
-| 2 | Passos duplicados | login (4x), checagem de cookie (6x), checagem de `pathname` (11x) | Mudança de fluxo exige editar vários lugares; o teste fica longo e ruidoso |
+| 1 | Seletores `[data-cy=...]` espalhados | 16 ocorrências (`[data-cy=`) em CT01–CT05 | Se um `data-cy` mudar, é preciso caçar o texto em todos os testes |
+| 2 | Passos duplicados | login (4 chamadas), checagem de cookie (5x), checagem de `pathname` (9x) | Mudança de fluxo exige editar vários lugares; o teste fica longo e ruidoso |
 | 3 | Dados dentro do teste | e-mail, senha, nome, título e descrição do chamado, mensagem de erro | Não dá para reaproveitar nem trocar massa de dados sem mexer no código |
 | 4 | Dependência do back-end real e do seed | CT02 e CT04 | Teste falha por 429 (limite de login), banco sujo ou API fora do ar, sem a UI ter defeito; o caminho de falha da API só funciona se houver um usuário real |
 | 5 | Dado não determinístico | CT04: `Date.now()` no título | Resultado muda a cada execução e a lista cresce a cada run |
